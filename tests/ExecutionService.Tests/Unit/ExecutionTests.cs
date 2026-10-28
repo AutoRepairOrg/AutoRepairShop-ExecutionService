@@ -144,6 +144,44 @@ public class ExecutionTests
     }
 
     [Fact]
+    public void Fail_ShouldSetStatusFailed_AndPublishExecutionFailedEvent()
+    {
+        var execution = Start();
+
+        execution.Fail("Peça indisponível");
+
+        execution.Status.Should().Be(ExecutionStatus.Failed);
+        execution.FailureReason.Should().Be("Peça indisponível");
+        execution.FailedAt.Should().NotBeNull();
+        execution.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<ExecutionFailedEvent>()
+            .Which.Should().Match<ExecutionFailedEvent>(e =>
+                e.OsId == OsId && e.Reason == "Peça indisponível");
+    }
+
+    [Fact]
+    public void Fail_WhenNotInProgress_ShouldThrow()
+    {
+        var execution = Start();
+        execution.Complete();
+
+        var act = () => execution.Fail("tarde demais");
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Cancel_WhenFailed_ShouldBeIdempotent()
+    {
+        var execution = Start();
+        execution.Fail("Peça indisponível");
+
+        execution.Cancel("OS cancelada");
+
+        execution.Status.Should().Be(ExecutionStatus.Failed);
+        execution.FailureReason.Should().Be("Peça indisponível");
+    }
+
+    [Fact]
     public void ClearDomainEvents_ShouldEmptyTheList()
     {
         var execution = Start();

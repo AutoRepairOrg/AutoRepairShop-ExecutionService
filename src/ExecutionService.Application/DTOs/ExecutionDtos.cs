@@ -11,8 +11,12 @@ public record ExecutionResponse(
     DateTime? CompletedAt,
     string? Notes,
     DateTime? CancelledAt,
-    string? CancellationReason);
+    string? CancellationReason,
+    DateTime? FailedAt,
+    string? FailureReason);
 
 public record AddNotesRequest(string Notes);
 
 public record CancelExecutionRequest(string Reason);
+
+public record FailExecutionRequest(string Reason);

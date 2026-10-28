@@ -11,3 +11,10 @@ public abstract record DomainEvent(Guid AggregateId, DateTime OccurredAt)
 /// </summary>
 public record ExecutionCompletedEvent(Guid OsId)
     : DomainEvent(OsId);
+
+/// <summary>
+/// Publicado quando a execução falha na oficina.
+/// Consumido pelo OsService (cancela a OS e publica OsCancelledEvent).
+/// </summary>
+public record ExecutionFailedEvent(Guid OsId, string Reason)
+    : DomainEvent(OsId);

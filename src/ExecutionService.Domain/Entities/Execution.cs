@@ -20,6 +20,8 @@ public class Execution
     public string? Notes { get; private set; }
     public DateTime? CancelledAt { get; private set; }
     public string? CancellationReason { get; private set; }
+    public DateTime? FailedAt { get; private set; }
+    public string? FailureReason { get; private set; }
 
     private readonly List<DomainEvent> _domainEvents = [];
 
@@ -60,6 +62,21 @@ public class Execution
         AddDomainEvent(new ExecutionCompletedEvent(OsId));
     }
 
+    /// <summary>
+    /// Técnico registra falha na oficina e publica ExecutionFailedEvent.
+    /// OsService consome o evento, cancela a OS e republica OsCancelledEvent.
+    /// </summary>
+    public void Fail(string reason)
+    {
+        EnsureStatus(ExecutionStatus.InProgress, "Somente execuções InProgress podem falhar.");
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+
+        Status = ExecutionStatus.Failed;
+        FailureReason = reason;
+        FailedAt = DateTime.UtcNow;
+        AddDomainEvent(new ExecutionFailedEvent(OsId, reason));
+    }
+
     public void AddNotes(string notes)
     {
         EnsureStatus(ExecutionStatus.InProgress, "Observações só podem ser adicionadas em execuções InProgress.");
@@ -71,11 +88,11 @@ public class Execution
 
     /// <summary>
     /// Compensação do Saga (OsCancelledEvent) ou override manual.
-    /// Idempotente se já estiver Cancelled ou Completed.
+    /// Idempotente se já estiver Cancelled, Completed ou Failed.
     /// </summary>
     public void Cancel(string reason)
     {
-        if (Status is ExecutionStatus.Cancelled or ExecutionStatus.Completed)
+        if (Status is ExecutionStatus.Cancelled or ExecutionStatus.Completed or ExecutionStatus.Failed)
             return;
 
         ArgumentException.ThrowIfNullOrWhiteSpace(reason);
