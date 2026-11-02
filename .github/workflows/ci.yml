@@ -47,6 +47,7 @@ jobs:
             || (echo "Coverage $COVERAGE% < 80%. Pipeline bloqueado." && exit 1)
 
       - name: Upload coverage
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
