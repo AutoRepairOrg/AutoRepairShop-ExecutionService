@@ -124,4 +124,34 @@ public class ExecutionAppServiceTests
         result.Status.Should().Be("Cancelled");
         result.CancellationReason.Should().Be("Override do técnico");
     }
+
+    [Fact]
+    public async Task FailAsync_ShouldPersistAndPublishEvent()
+    {
+        var osId = Guid.NewGuid();
+        var execution = Execution.Start(osId, "Ana", "XYZ1234");
+        _repo.Setup(r => r.GetByOsIdAsync(osId, default)).ReturnsAsync(execution);
+        _repo.Setup(r => r.UpdateAsync(execution, default)).Returns(Task.CompletedTask);
+        _publisher.Setup(p => p.PublishAsync(It.IsAny<DomainEvent>(), default)).Returns(Task.CompletedTask);
+
+        var result = await _sut.FailAsync(osId, "Peça indisponível");
+
+        result.Status.Should().Be("Failed");
+        result.FailureReason.Should().Be("Peça indisponível");
+        result.FailedAt.Should().NotBeNull();
+        execution.DomainEvents.Should().BeEmpty();
+        _repo.Verify(r => r.UpdateAsync(execution, default), Times.Once);
+        _publisher.Verify(p => p.PublishAsync(
+            It.Is<ExecutionFailedEvent>(e => e.OsId == osId && e.Reason == "Peça indisponível"),
+            default), Times.Once);
+    }
+
+    [Fact]
+    public async Task FailAsync_WhenNotFound_ShouldThrow()
+    {
+        _repo.Setup(r => r.GetByOsIdAsync(It.IsAny<Guid>(), default)).ReturnsAsync((Execution?)null);
+
+        var act = async () => await _sut.FailAsync(Guid.NewGuid(), "Motivo");
+        await act.Should().ThrowAsync<KeyNotFoundException>();
+    }
 }

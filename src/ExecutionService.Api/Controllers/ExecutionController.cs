@@ -41,7 +41,7 @@ public class ExecutionController(ExecutionAppService appService) : ControllerBas
         }
     }
 
-    /// <summary>Fila de execuções por status (InProgress, Completed, Cancelled).</summary>
+    /// <summary>Fila de execuções por status (InProgress, Completed, Cancelled, Failed).</summary>
     [HttpGet]
     [ProducesResponseType(typeof(IReadOnlyList<ExecutionResponse>), StatusCodes.Status200OK)]
     public async Task<IActionResult> List([FromQuery] string status, CancellationToken ct)
@@ -71,6 +71,33 @@ public class ExecutionController(ExecutionAppService appService) : ControllerBas
         catch (KeyNotFoundException)
         {
             return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Técnico registra falha na oficina e publica ExecutionFailedEvent.
+    /// OsService cancela a OS e dispara a compensação via OsCancelledEvent.
+    /// </summary>
+    [HttpPatch("os/{osId:guid}/fail")]
+    [ProducesResponseType(typeof(ExecutionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Fail(Guid osId, [FromBody] FailExecutionRequest request, CancellationToken ct)
+    {
+        try
+        {
+            return Ok(await appService.FailAsync(osId, request.Reason, ct));
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
         }
         catch (InvalidOperationException ex)
         {

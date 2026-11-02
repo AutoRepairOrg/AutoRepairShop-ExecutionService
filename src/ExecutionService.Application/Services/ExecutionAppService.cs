@@ -29,7 +29,7 @@ public class ExecutionAppService(
     public async Task<IReadOnlyList<ExecutionResponse>> ListByStatusAsync(string status, CancellationToken ct = default)
     {
         if (!Enum.TryParse<ExecutionStatus>(status, ignoreCase: true, out var parsed))
-            throw new ArgumentException($"Status inválido: {status}. Use InProgress, Completed ou Cancelled.");
+            throw new ArgumentException($"Status inválido: {status}. Use InProgress, Completed, Cancelled ou Failed.");
 
         var executions = await repository.ListByStatusAsync(parsed, ct);
         return executions.Select(MapToResponse).ToList();
@@ -39,6 +39,15 @@ public class ExecutionAppService(
     {
         var execution = await GetByOsOrThrowAsync(osId, ct);
         execution.Complete();
+        await repository.UpdateAsync(execution, ct);
+        await PublishDomainEventsAsync(execution, ct);
+        return MapToResponse(execution);
+    }
+
+    public async Task<ExecutionResponse> FailAsync(Guid osId, string reason, CancellationToken ct = default)
+    {
+        var execution = await GetByOsOrThrowAsync(osId, ct);
+        execution.Fail(reason);
         await repository.UpdateAsync(execution, ct);
         await PublishDomainEventsAsync(execution, ct);
         return MapToResponse(execution);
@@ -83,5 +92,7 @@ public class ExecutionAppService(
         execution.CompletedAt,
         execution.Notes,
         execution.CancelledAt,
-        execution.CancellationReason);
+        execution.CancellationReason,
+        execution.FailedAt,
+        execution.FailureReason);
 }
