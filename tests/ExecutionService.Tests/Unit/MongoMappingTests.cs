@@ -13,6 +13,7 @@ public class MongoMappingTests
     public void Execution_RoundTripsThroughBson()
     {
         MongoMappings.Register();
+        MongoMappings.Register();
 
         var osId = Guid.NewGuid();
         var execution = Execution.Start(osId, "Ana", "abc1234", "Alinhamento");
