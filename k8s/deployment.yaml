@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: execution-service
-          image: DOCKERHUB_USERNAME/execution-service:latest
+          image: ghcr.io/mateusnpinheiro95/execution-service:latest
           ports:
             - containerPort: 8080
           env:
