@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: execution-service
-          image: ghcr.io/mateusnpinheiro95/execution-service:latest
+          image: ghcr.io/autorepairorg/execution-service:latest
           ports:
             - containerPort: 8080
           env:
