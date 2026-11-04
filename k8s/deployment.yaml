@@ -1,3 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: autorepair
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -6,7 +11,7 @@ metadata:
   labels:
     app: execution-service
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: execution-service
@@ -15,6 +20,8 @@ spec:
       labels:
         app: execution-service
     spec:
+      imagePullSecrets:
+        - name: ghcr-pull
       containers:
         - name: execution-service
           image: ghcr.io/autorepairorg/execution-service:latest
@@ -26,26 +33,42 @@ spec:
             - name: Messaging__UseStub
               value: "false"
             - name: ConnectionStrings__ExecutionDatabase
-              valueFrom:
-                secretKeyRef:
-                  name: execution-service-secrets
-                  key: db-connection-string
+              value: "mongodb://127.0.0.1:27017/ExecutionServiceDb"
             - name: RabbitMQ__Host
               valueFrom:
                 configMapKeyRef:
                   name: execution-service-config
                   key: rabbitmq-host
+            - name: RabbitMQ__Port
+              valueFrom:
+                configMapKeyRef:
+                  name: execution-service-config
+                  key: rabbitmq-port
+            - name: RabbitMQ__User
+              valueFrom:
+                configMapKeyRef:
+                  name: execution-service-config
+                  key: rabbitmq-user
+            - name: RabbitMQ__Password
+              valueFrom:
+                configMapKeyRef:
+                  name: execution-service-config
+                  key: rabbitmq-password
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 36
           livenessProbe:
             httpGet:
               path: /health
               port: 8080
-            initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /health
               port: 8080
-            initialDelaySeconds: 10
             periodSeconds: 5
           resources:
             requests:
@@ -54,6 +77,28 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+        - name: mongo
+          image: mongo:7
+          ports:
+            - containerPort: 27017
+          volumeMounts:
+            - name: mongo-data
+              mountPath: /data/db
+          readinessProbe:
+            tcpSocket:
+              port: 27017
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: mongo-data
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -78,8 +123,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: execution-service
-  minReplicas: 2
-  maxReplicas: 10
+  minReplicas: 1
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:
@@ -96,3 +141,63 @@ metadata:
 data:
   rabbitmq-host: "rabbitmq-service"
   rabbitmq-port: "5672"
+  rabbitmq-user: "autorepair"
+  rabbitmq-password: "autorepair"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: autorepair
+  labels:
+    app: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3-management
+          ports:
+            - containerPort: 5672
+            - containerPort: 15672
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: "autorepair"
+            - name: RABBITMQ_DEFAULT_PASS
+              value: "autorepair"
+          readinessProbe:
+            tcpSocket:
+              port: 5672
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq-service
+  namespace: autorepair
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672
+  type: ClusterIP
