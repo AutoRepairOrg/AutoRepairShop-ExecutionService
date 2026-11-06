@@ -17,7 +17,8 @@ src/
 └── ExecutionService.Infrastructure → MongoDB, RabbitMQ
 tests/
 └── ExecutionService.Tests
-    └── Unit/                       → Testes unitários (xUnit + FluentAssertions + Moq)
+    ├── Unit/                       → Testes unitários (xUnit + FluentAssertions + Moq)
+    └── BDD/                        → Cenários Gherkin da saga (Reqnroll)
 k8s/                                → Deployment, Service, HPA, ConfigMap
 .github/workflows/ci.yml            → CI/CD (Build → Testes → SonarQube → Docker → K8s)
 ```
@@ -87,6 +88,20 @@ Medição local em 5 de novembro de 2026, configuração Release, relatório Ope
 |---|---|---|
 | 57 aprovados | 254 / 265 | **95,8%** |
 
+### BDD (Gherkin)
+
+Os cenários ficam em `tests/ExecutionService.Tests/BDD/ExecucaoNaOficina.feature`, escritos em português (`# language: pt`). O Reqnroll (sucessor do SpecFlow) transforma cada `Cenário` em teste xUnit e liga os passos à classe `ExecucaoNaOficinaSteps`. A execução é em memória: repositório e publicador de eventos são falsos, sem MongoDB nem RabbitMQ.
+
+| Cenário | O que confere |
+|---|---|
+| Técnico conclui o serviço | `InProgress`, depois `Completed` e `ExecutionCompletedEvent` |
+| Técnico registra falha | `Failed` e `ExecutionFailedEvent` |
+| Cancelamento da ordem encerra a tarefa em andamento | `Cancelled` |
+
+```powershell
+dotnet test tests/ExecutionService.Tests/ExecutionService.Tests.csproj --filter FullyQualifiedName~BDD
+```
+
 ### SonarQube
 
 O job `Build, Test & Quality` analisa o código com o SonarScanner para .NET: o `begin` envolve o build, os testes geram o OpenCover e o `end` publica o resultado. A chave é `AutoRepairOrg_AutoRepairShop-ExecutionService`, na organização `autorepairorg`.
@@ -126,6 +141,7 @@ O painel para importar está em `observability/datadog-dashboard.json` (Dashboar
 - MongoDB 7 (MongoDB.Driver)
 - RabbitMQ (mensageria — Saga coreografado)
 - xUnit + FluentAssertions + Moq
+- Reqnroll + Gherkin (BDD)
 - Docker + Kubernetes
 - GitHub Actions (CI/CD)
 - SonarQube
