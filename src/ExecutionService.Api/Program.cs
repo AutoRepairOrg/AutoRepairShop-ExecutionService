@@ -1,3 +1,4 @@
+using ExecutionService.Api.Observability;
 using ExecutionService.Application.Events;
 using ExecutionService.Application.Interfaces;
 using ExecutionService.Application.Services;
@@ -5,8 +6,13 @@ using ExecutionService.Domain.Interfaces;
 using ExecutionService.Infrastructure.Messaging;
 using ExecutionService.Infrastructure.Persistence;
 using MongoDB.Driver;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Host.UseSerilog((context, _, loggerConfiguration) =>
+    DatadogObservability.Configure(loggerConfiguration, context.Configuration, "execution-service"));
+builder.Services.AddDatadog(builder.Configuration, "execution-service");
 
 // ── Database (MongoDB) ────────────────────────────────────────────────────────
 var mongoConnectionString = builder.Configuration.GetConnectionString("ExecutionDatabase")
@@ -78,6 +84,8 @@ using (var scope = app.Services.CreateScope())
     var database = scope.ServiceProvider.GetRequiredService<IMongoDatabase>();
     await MongoExecutionRepository.EnsureIndexesAsync(database);
 }
+
+app.UseDatadog();
 
 app.UseSwagger();
 app.UseSwaggerUI();
